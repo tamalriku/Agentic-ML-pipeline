@@ -151,7 +151,7 @@ Be direct, technical, and specific. Avoid generic statements. Use concrete obser
     async def event_stream():
         try:
             stream = await client.chat.completions.create(
-                model="anthropic/claude-3-5-sonnet",
+                model="meta-llama/llama-3.3-70b-instruct:free",
                 max_tokens=400,
                 messages=[{"role": "user", "content": prompt}],
                 stream=True,
@@ -160,9 +160,12 @@ Be direct, technical, and specific. Avoid generic statements. Use concrete obser
                 if chunk.choices and chunk.choices[0].delta.content:
                     payload = json.dumps({"token": chunk.choices[0].delta.content})
                     yield f"data: {payload}\n\n"
+                    await asyncio.sleep(0)  # yield control to avoid buffering
             yield "data: [DONE]\n\n"
         except Exception as e:
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            error_msg = str(e)
+            yield f"data: {json.dumps({'error': error_msg})}\n\n"
+            yield "data: [DONE]\n\n"
 
     return StreamingResponse(
         event_stream(),

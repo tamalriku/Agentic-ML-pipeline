@@ -15,6 +15,12 @@ class EDAReport(BaseModel):
     n_classes: Optional[int]
     class_balance: Optional[str]  # balanced | imbalanced | N/A
     sample_preview: List[Dict[str, Any]]
+    # Enriched dataset statistics for intelligent model selection
+    sparsity: float = 0.0           # fraction of zero cells in numeric features
+    mean_skewness: float = 0.0      # average |skewness| across numeric features
+    outlier_ratio: float = 0.0      # fraction of values beyond 3-sigma
+    linearity_score: float = 0.0    # avg |Pearson r| of features with target (0=nonlinear, 1=linear)
+    high_cardinality_cols: List[str] = []  # categorical cols with >20 unique values
 
 
 class PreprocessingConfig(BaseModel):

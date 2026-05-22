@@ -242,7 +242,7 @@
     <div class="panel hidden" id="commentary-panel">
       <div class="panel-header">
         <span class="ph-label">▸ AGENT COMMENTARY</span>
-        <span class="ph-right" style="color:var(--green-dim)">claude-sonnet-4</span>
+        <span class="ph-right" style="color:var(--green-dim)">llama-3.3-70b · free</span>
       </div>
       <div class="panel-body">
         <div id="commentary-text"><span class="cursor"></span></div>
@@ -456,18 +456,29 @@ async function startCommentary(eda, sel, ev) {
   es.onmessage = e => {
     if (e.data === '[DONE]') {
       es.close();
-      textEl.innerHTML = accumulated;
+      textEl.innerHTML = accumulated || '<span style="color:var(--red)">No commentary returned.</span>';
       return;
     }
     try {
       const payload = JSON.parse(e.data);
-      if (payload.error) { es.close(); return; }
+      if (payload.error) {
+        es.close();
+        textEl.innerHTML = `<span style="color:var(--red)">⚠ Commentary error: ${payload.error}</span>`;
+        return;
+      }
       accumulated += payload.token;
       textEl.innerHTML = accumulated + '<span class="cursor"></span>';
     } catch {}
   };
 
-  es.onerror = () => es.close();
+  es.onerror = () => {
+    es.close();
+    if (!accumulated) {
+      textEl.innerHTML = '<span style="color:var(--red)">⚠ Failed to connect to commentary stream. Check your API key and model availability.</span>';
+    } else {
+      textEl.innerHTML = accumulated;
+    }
+  };
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
