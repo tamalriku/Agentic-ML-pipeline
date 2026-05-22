@@ -32,6 +32,12 @@ app.add_middleware(
 FRONTEND_PATH = Path(__file__).parent.parent / "frontend" / "index.html"
 
 
+@app.get("/health")
+async def health_check():
+    """Lightweight ping endpoint — used by UptimeRobot to keep the service awake."""
+    return {"status": "ok"}
+
+
 @app.get("/", response_class=HTMLResponse)
 async def serve_frontend():
     if not FRONTEND_PATH.exists():
