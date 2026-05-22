@@ -1,0 +1,476 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agentic ML Pipeline</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #080c09;
+    --surface: #0d1410;
+    --surface2: #111a13;
+    --border: #1e2d20;
+    --border2: #2a3d2c;
+    --green: #4ade80;
+    --green-dim: #22c55e;
+    --green-muted: #166534;
+    --green-glow: rgba(74,222,128,0.08);
+    --blue: #60a5fa;
+    --amber: #fbbf24;
+    --red: #f87171;
+    --text: #e2f0e4;
+    --text-dim: #7a9e7e;
+    --text-muted: #3d5c40;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Space Grotesk', sans-serif;
+  }
+
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--mono); }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+    pointer-events: none; z-index: 9999;
+  }
+
+  .container { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+  /* Header */
+  header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 2.5rem; }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon { width: 36px; height: 36px; border: 1.5px solid var(--green-dim); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; color: var(--green); }
+  .logo-text h1 { font-family: var(--mono); font-size: 15px; font-weight: 600; color: var(--green); letter-spacing: 0.12em; }
+  .logo-text p { font-size: 11px; color: var(--text-dim); letter-spacing: 0.06em; margin-top: 2px; }
+  .status-pill { font-size: 10px; letter-spacing: 0.1em; padding: 4px 10px; border-radius: 20px; border: 1px solid var(--green-muted); color: var(--green-dim); background: var(--green-glow); display: flex; align-items: center; gap: 6px; }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: blink 2s ease-in-out infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  /* Stage pipeline bar */
+  .pipeline-bar { display: flex; align-items: center; margin-bottom: 2rem; }
+  .stage-item { display: flex; align-items: center; gap: 6px; }
+  .stage-node { width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--border2); display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--text-muted); transition: all 0.4s; }
+  .stage-label { font-size: 9px; letter-spacing: 0.1em; color: var(--text-muted); transition: color 0.4s; white-space: nowrap; }
+  .stage-line { flex: 1; height: 1px; background: var(--border); margin: 0 4px; min-width: 10px; transition: background 0.4s; }
+  .stage-item.active .stage-node { border-color: var(--green); color: var(--green); background: var(--green-glow); }
+  .stage-item.active .stage-label { color: var(--green); }
+  .stage-item.done .stage-node { border-color: var(--green-muted); color: var(--green-muted); background: transparent; }
+  .stage-item.done .stage-label { color: var(--text-muted); }
+  .stage-item.done + .stage-line { background: var(--green-muted); }
+
+  /* Upload zone */
+  #upload-zone {
+    border: 1.5px dashed var(--border2);
+    border-radius: 12px;
+    padding: 3rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s;
+    background: var(--surface);
+    position: relative;
+    overflow: hidden;
+  }
+  #upload-zone::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 100%, rgba(74,222,128,0.04) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  #upload-zone:hover, #upload-zone.drag {
+    border-color: var(--green-dim);
+    background: #0a160c;
+  }
+  #upload-zone .up-icon { font-size: 40px; margin-bottom: 1rem; display: block; }
+  #upload-zone h2 { font-family: var(--sans); font-size: 16px; font-weight: 500; color: var(--text); margin-bottom: 6px; }
+  #upload-zone p { font-size: 12px; color: var(--text-dim); }
+  #upload-zone .hint { font-size: 11px; color: var(--text-muted); margin-top: 8px; }
+  #csv-file { display: none; }
+
+  /* Panel */
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 1rem; overflow: hidden; }
+  .panel-header { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .panel-header .ph-label { font-size: 10px; letter-spacing: 0.12em; color: var(--green-dim); font-weight: 600; }
+  .panel-header .ph-right { margin-left: auto; font-size: 10px; color: var(--text-muted); }
+  .panel-body { padding: 1rem 1.25rem; }
+
+  /* Log */
+  #log { font-size: 12px; line-height: 2; max-height: 220px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+  .log-line { display: flex; gap: 10px; }
+  .log-ts { color: var(--text-muted); flex-shrink: 0; }
+  .c-ok { color: var(--green); }
+  .c-info { color: var(--blue); }
+  .c-warn { color: var(--amber); }
+  .c-err { color: var(--red); }
+  .c-dim { color: var(--text-dim); }
+
+  /* Metrics grid */
+  .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+  .metric-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 14px 12px; }
+  .metric-card .mc-label { font-size: 10px; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 6px; }
+  .metric-card .mc-value { font-size: 26px; font-weight: 600; color: var(--text); letter-spacing: -0.02em; }
+  .metric-card .mc-sub { font-size: 10px; color: var(--green-dim); margin-top: 4px; }
+
+  /* Model badge */
+  .model-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; padding: 5px 12px; border-radius: 20px; background: var(--green-glow); border: 1px solid var(--green-muted); color: var(--green); margin-bottom: 12px; letter-spacing: 0.06em; }
+
+  /* Feature importance */
+  .fi-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+  .fi-row:last-child { border-bottom: none; }
+  .fi-name { font-size: 12px; color: var(--text-dim); width: 160px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fi-bar-wrap { flex: 1; background: var(--surface2); border-radius: 3px; height: 6px; overflow: hidden; }
+  .fi-bar { height: 6px; border-radius: 3px; background: var(--green); transition: width 1s ease; }
+  .fi-score { font-size: 11px; color: var(--text-muted); width: 44px; text-align: right; flex-shrink: 0; }
+
+  /* Commentary */
+  #commentary-text { font-family: var(--sans); font-size: 13px; line-height: 1.85; color: var(--text-dim); min-height: 60px; }
+  .cursor { display: inline-block; width: 8px; height: 14px; background: var(--green); animation: blink 0.8s step-end infinite; vertical-align: text-bottom; margin-left: 2px; }
+
+  /* Preprocessing tags */
+  .tag { display: inline-block; font-size: 10px; padding: 3px 8px; border-radius: 4px; margin: 2px; letter-spacing: 0.04em; }
+  .tag-blue { background: #0a0f1c; color: var(--blue); border: 1px solid #1e3a5f; }
+  .tag-green { background: var(--green-glow); color: var(--green-dim); border: 1px solid var(--green-muted); }
+  .tag-amber { background: #130e00; color: var(--amber); border: 1px solid #5c3d00; }
+
+  /* EDA summary */
+  .eda-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; }
+  .eda-cell { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 10px; }
+  .eda-cell .ec-label { font-size: 9px; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 4px; }
+  .eda-cell .ec-val { font-size: 18px; font-weight: 600; color: var(--text); }
+
+  /* Hidden by default */
+  .hidden { display: none !important; }
+
+  /* Spinner inline */
+  .spin { display: inline-block; width: 10px; height: 10px; border: 1.5px solid var(--border2); border-top-color: var(--green); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  footer { text-align: center; font-size: 11px; color: var(--text-muted); margin-top: 3rem; letter-spacing: 0.06em; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="logo">
+      <div class="logo-icon">⬡</div>
+      <div class="logo-text">
+        <h1>AGENTIC ML PIPELINE</h1>
+        <p>SKLEARN · FASTAPI · CLAUDE</p>
+      </div>
+    </div>
+    <div class="status-pill"><span class="status-dot"></span>AGENT READY</div>
+  </header>
+
+  <!-- Stage bar -->
+  <div class="pipeline-bar" id="pipeline-bar">
+    <div class="stage-item" id="st-0"><div class="stage-node">01</div><span class="stage-label">INGEST</span></div>
+    <div class="stage-line"></div>
+    <div class="stage-item" id="st-1"><div class="stage-node">02</div><span class="stage-label">EDA</span></div>
+    <div class="stage-line"></div>
+    <div class="stage-item" id="st-2"><div class="stage-node">03</div><span class="stage-label">PREPROCESS</span></div>
+    <div class="stage-line"></div>
+    <div class="stage-item" id="st-3"><div class="stage-node">04</div><span class="stage-label">SELECT</span></div>
+    <div class="stage-line"></div>
+    <div class="stage-item" id="st-4"><div class="stage-node">05</div><span class="stage-label">TRAIN</span></div>
+    <div class="stage-line"></div>
+    <div class="stage-item" id="st-5"><div class="stage-node">06</div><span class="stage-label">EVALUATE</span></div>
+  </div>
+
+  <!-- Upload -->
+  <div id="upload-zone" onclick="document.getElementById('csv-file').click()">
+    <span class="up-icon">⬆</span>
+    <h2>Drop your CSV dataset here</h2>
+    <p>Task type is detected automatically — classification, regression, or clustering</p>
+    <p class="hint">Supports any tabular CSV · max recommended 50k rows</p>
+  </div>
+  <input type="file" id="csv-file" accept=".csv">
+
+  <!-- Results area -->
+  <div id="results-wrap" class="hidden" style="margin-top:1.5rem">
+
+    <!-- Log panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="ph-label">▸ PIPELINE LOG</span>
+        <span class="ph-right" id="log-status">RUNNING <span class="spin"></span></span>
+      </div>
+      <div class="panel-body">
+        <div id="log"></div>
+      </div>
+    </div>
+
+    <!-- EDA panel -->
+    <div class="panel hidden" id="eda-panel">
+      <div class="panel-header"><span class="ph-label">▸ EDA SUMMARY</span></div>
+      <div class="panel-body">
+        <div class="eda-grid" id="eda-grid"></div>
+        <div style="margin-top:10px" id="eda-tags"></div>
+      </div>
+    </div>
+
+    <!-- Model selection panel -->
+    <div class="panel hidden" id="sel-panel">
+      <div class="panel-header"><span class="ph-label">▸ MODEL SELECTION</span></div>
+      <div class="panel-body">
+        <div class="model-tag" id="sel-model-badge">—</div>
+        <p style="font-size:12px; color:var(--text-dim); line-height:1.7" id="sel-reason"></p>
+        <p style="font-size:11px; color:var(--text-muted); margin-top:8px" id="sel-alt"></p>
+      </div>
+    </div>
+
+    <!-- Metrics panel -->
+    <div class="panel hidden" id="metrics-panel">
+      <div class="panel-header"><span class="ph-label">▸ EVALUATION METRICS</span></div>
+      <div class="panel-body">
+        <div class="metrics-grid" id="metrics-grid"></div>
+        <p style="font-size:11px; color:var(--text-muted); margin-top:10px" id="cv-line"></p>
+      </div>
+    </div>
+
+    <!-- Feature importance panel -->
+    <div class="panel hidden" id="fi-panel">
+      <div class="panel-header"><span class="ph-label">▸ FEATURE IMPORTANCE</span></div>
+      <div class="panel-body" id="fi-body"></div>
+    </div>
+
+    <!-- LLM commentary panel -->
+    <div class="panel hidden" id="commentary-panel">
+      <div class="panel-header">
+        <span class="ph-label">▸ AGENT COMMENTARY</span>
+        <span class="ph-right" style="color:var(--green-dim)">claude-sonnet-4</span>
+      </div>
+      <div class="panel-body">
+        <div id="commentary-text"><span class="cursor"></span></div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<footer>AGENTIC ML PIPELINE · SKLEARN + FASTAPI · MIT LICENSE</footer>
+
+<script>
+const dropzone = document.getElementById('upload-zone');
+const fileInput = document.getElementById('csv-file');
+let pipelineData = null;
+
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault(); dropzone.classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f) kickOff(f);
+});
+fileInput.addEventListener('change', e => { if (e.target.files[0]) kickOff(e.target.files[0]); });
+
+function setStage(idx) {
+  for (let i = 0; i <= 5; i++) {
+    const el = document.getElementById(`st-${i}`);
+    el.classList.remove('active', 'done');
+    if (i < idx) el.classList.add('done');
+    if (i === idx) el.classList.add('active');
+  }
+}
+
+function log(msg, cls='c-info') {
+  const area = document.getElementById('log');
+  const ts = new Date().toLocaleTimeString('en-GB', { hour12: false });
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  line.innerHTML = `<span class="log-ts c-dim">[${ts}]</span><span class="${cls}">${msg}</span>`;
+  area.appendChild(line);
+  area.scrollTop = area.scrollHeight;
+}
+
+async function kickOff(file) {
+  if (!file.name.endsWith('.csv')) { alert('Please upload a CSV file.'); return; }
+
+  document.getElementById('results-wrap').classList.remove('hidden');
+  ['eda-panel','sel-panel','metrics-panel','fi-panel','commentary-panel']
+    .forEach(id => document.getElementById(id).classList.add('hidden'));
+  document.getElementById('log').innerHTML = '';
+  document.getElementById('log-status').innerHTML = 'RUNNING <span class="spin"></span>';
+
+  setStage(0);
+  log(`Ingesting: ${file.name} (${(file.size/1024).toFixed(1)} KB)`, 'c-ok');
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    setStage(1);
+    log('Sending to pipeline agent...', 'c-info');
+
+    const resp = await fetch('/api/run-pipeline', { method: 'POST', body: formData });
+    if (!resp.ok) {
+      let errMsg = 'Unknown error';
+      try {
+        const err = await resp.json();
+        errMsg = err.detail || errMsg;
+      } catch {
+        errMsg = await resp.text().catch(() => `HTTP ${resp.status}`);
+      }
+      log('Pipeline error: ' + errMsg, 'c-err');
+      document.getElementById('log-status').textContent = 'ERROR';
+      return;
+    }
+
+    const data = await resp.json();
+    pipelineData = data;
+
+    const eda = data.eda;
+    const prep = data.preprocessing;
+    const sel = data.selection;
+    const ev = data.evaluation;
+
+    // EDA stage
+    setStage(1);
+    log(`EDA complete — ${eda.n_rows} rows × ${eda.n_cols} cols`, 'c-ok');
+    log(`Task type detected: ${eda.task_type.toUpperCase()}`, 'c-info');
+    log(`Target column: ${eda.target_column || 'N/A'}`, 'c-info');
+    log(`Missing data: ${eda.total_missing_pct.toFixed(1)}%`, eda.total_missing_pct > 10 ? 'c-warn' : 'c-dim');
+    if (eda.class_balance === 'imbalanced') log('⚠ Class imbalance detected', 'c-warn');
+    renderEDA(eda, prep);
+
+    await sleep(200);
+    // Preprocessing stage
+    setStage(2);
+    prep.steps_summary.forEach(s => log('→ ' + s, 'c-dim'));
+
+    await sleep(200);
+    // Selection stage
+    setStage(3);
+    log(`Selected model: ${sel.selected_model}`, 'c-ok');
+    log(`Alternative: ${sel.alternative_model}`, 'c-dim');
+    renderSelection(sel);
+
+    await sleep(200);
+    // Train stage
+    setStage(4);
+    log(`Training ${sel.selected_model} with GridSearchCV...`, 'c-info');
+    log(`Best params: ${JSON.stringify(ev.best_params)}`, 'c-dim');
+
+    await sleep(200);
+    // Evaluate stage
+    setStage(5);
+    log('Evaluation complete ✓', 'c-ok');
+    renderMetrics(ev);
+    if (ev.feature_importance) renderFeatureImportance(ev.feature_importance);
+
+    document.getElementById('log-status').innerHTML = 'COMPLETE ✓';
+
+    // Start LLM commentary stream
+    await startCommentary(eda, sel, ev);
+
+  } catch (err) {
+    log('Unexpected error: ' + err.message, 'c-err');
+    document.getElementById('log-status').textContent = 'ERROR';
+  }
+}
+
+function renderEDA(eda, prep) {
+  const panel = document.getElementById('eda-panel');
+  panel.classList.remove('hidden');
+
+  const grid = document.getElementById('eda-grid');
+  const cells = [
+    { label: 'ROWS', val: eda.n_rows.toLocaleString() },
+    { label: 'COLS', val: eda.n_cols },
+    { label: 'NUMERIC', val: eda.numeric_features.length },
+    { label: 'CATEGORICAL', val: eda.categorical_features.length },
+    { label: 'MISSING %', val: eda.total_missing_pct.toFixed(1) + '%' },
+    { label: 'CLASSES', val: eda.n_classes ?? '—' },
+  ];
+  grid.innerHTML = cells.map(c => `
+    <div class="eda-cell">
+      <div class="ec-label">${c.label}</div>
+      <div class="ec-val">${c.val}</div>
+    </div>
+  `).join('');
+
+  const tags = document.getElementById('eda-tags');
+  const taskTag = `<span class="tag tag-green">${eda.task_type.toUpperCase()}</span>`;
+  const balTag = eda.class_balance !== 'N/A' ? `<span class="tag ${eda.class_balance === 'imbalanced' ? 'tag-amber' : 'tag-blue'}">${eda.class_balance.toUpperCase()}</span>` : '';
+  const prepTags = prep.steps_summary.map(s => `<span class="tag tag-blue">${s}</span>`).join('');
+  tags.innerHTML = taskTag + balTag + '<br style="margin:4px 0">' + prepTags;
+}
+
+function renderSelection(sel) {
+  document.getElementById('sel-panel').classList.remove('hidden');
+  document.getElementById('sel-model-badge').textContent = '⬡ ' + sel.selected_model;
+  document.getElementById('sel-reason').textContent = sel.rule_reason;
+  document.getElementById('sel-alt').textContent = `Alternative considered: ${sel.alternative_model}`;
+}
+
+function renderMetrics(ev) {
+  document.getElementById('metrics-panel').classList.remove('hidden');
+  const grid = document.getElementById('metrics-grid');
+  grid.innerHTML = Object.entries(ev.metrics).map(([k, v]) => `
+    <div class="metric-card">
+      <div class="mc-label">${k.toUpperCase().replace('_', ' ')}</div>
+      <div class="mc-value">${typeof v === 'number' ? v.toFixed(3) : v}</div>
+    </div>
+  `).join('');
+  document.getElementById('cv-line').textContent =
+    `Cross-validation score: ${ev.cv_score.toFixed(3)} ± ${ev.cv_std.toFixed(3)} (5-fold)`;
+}
+
+function renderFeatureImportance(fi) {
+  document.getElementById('fi-panel').classList.remove('hidden');
+  const body = document.getElementById('fi-body');
+  const max = fi[0].score;
+  body.innerHTML = fi.map(f => `
+    <div class="fi-row">
+      <span class="fi-name">${f.feature}</span>
+      <div class="fi-bar-wrap"><div class="fi-bar" style="width:${(f.score/max*100).toFixed(0)}%"></div></div>
+      <span class="fi-score">${(f.score*100).toFixed(1)}%</span>
+    </div>
+  `).join('');
+}
+
+async function startCommentary(eda, sel, ev) {
+  document.getElementById('commentary-panel').classList.remove('hidden');
+  const textEl = document.getElementById('commentary-text');
+  textEl.innerHTML = '<span class="cursor"></span>';
+
+  const params = new URLSearchParams({
+    task_type: eda.task_type,
+    model_name: sel.selected_model,
+    rule_reason: sel.rule_reason,
+    metrics: JSON.stringify(ev.metrics),
+    n_rows: eda.n_rows,
+    n_cols: eda.n_cols,
+    class_balance: eda.class_balance || 'N/A',
+    preprocessing_steps: (pipelineData.preprocessing.steps_summary || []).join('; '),
+  });
+
+  const es = new EventSource(`/api/commentary?${params}`);
+  let accumulated = '';
+
+  es.onmessage = e => {
+    if (e.data === '[DONE]') {
+      es.close();
+      textEl.innerHTML = accumulated;
+      return;
+    }
+    try {
+      const payload = JSON.parse(e.data);
+      if (payload.error) { es.close(); return; }
+      accumulated += payload.token;
+      textEl.innerHTML = accumulated + '<span class="cursor"></span>';
+    } catch {}
+  };
+
+  es.onerror = () => es.close();
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+</script>
+</body>
+</html>
