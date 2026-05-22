@@ -1,6 +1,6 @@
 # 🤖 Agentic ML Pipeline
 
-An end-to-end autonomous machine learning pipeline powered by **scikit-learn** + **Anthropic Claude**.
+An end-to-end autonomous machine learning pipeline powered by **scikit-learn** + **Claude code**.
 
 Upload any CSV → the agent performs EDA, selects the best model, tunes hyperparameters, evaluates performance, and delivers an LLM-written commentary — all without manual configuration.
 
