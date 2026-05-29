@@ -75,7 +75,7 @@ cp .env.example .env
 Open `.env` and add your key:
 
 ```env
-ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxx
+OPENROUTER_API_KEY=sk-ant-xxxxxxxxxxxxxxxx
 ```
 
 ### 4. Run the app
