@@ -43,7 +43,7 @@
 ### Prerequisites
 
 - Python 3.10+
-- An [Anthropic API key](https://console.anthropic.com/) (Claude)
+- An [Openrouter API key]
 
 ### 1. Clone the repo
 
